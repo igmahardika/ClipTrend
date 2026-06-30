@@ -39,6 +39,10 @@ return [
         'language' => env('WHISPER_LANGUAGE', null),
         'fp16' => (bool) env('WHISPER_FP16', false),
     ],
+    'ollama' => [
+        'url' => env('OLLAMA_URL', 'http://127.0.0.1:11434'),
+        'model' => env('OLLAMA_MODEL', 'llama3.2'),
+    ],
     'trends' => ['provider' => env('TREND_PROVIDER', 'youtube')],
     'subtitle_font_file' => env('SUBTITLE_FONT_FILE', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'),
     'watermark_text' => env('WATERMARK_TEXT', null),
