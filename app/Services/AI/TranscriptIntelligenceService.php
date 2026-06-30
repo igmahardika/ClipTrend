@@ -165,68 +165,94 @@ class TranscriptIntelligenceService
         return $this->openAiJson($model, [$prompt], 'copy_pack');
     }
 
+    private function getApiKeys(): array
+    {
+        $keysStr = config('cliptrend.openai.api_key') ?: env('OPENAI_API_KEY') ?: '';
+        $keys = array_filter(array_map('trim', explode(',', $keysStr)));
+        return array_values($keys);
+    }
+
     private function openAiJson(string $model, array $input, string $task): ?array
     {
-        $apiKey = config('cliptrend.openai.api_key') ?: env('OPENAI_API_KEY');
-        if (! $apiKey) {
+        $apiKeys = $this->getApiKeys();
+        if (empty($apiKeys)) {
             return null;
         }
 
-        if (str_starts_with($apiKey, 'AIzaSy') || str_starts_with($apiKey, 'AQ.')) {
-            $textPrompt = '';
-            foreach ($input as $msg) {
-                if (isset($msg['content'])) {
-                    if (is_array($msg['content'])) {
-                        foreach ($msg['content'] as $contentPart) {
-                            if (is_array($contentPart) && isset($contentPart['text'])) {
-                                $textPrompt .= $contentPart['text'] . "\n";
-                            } elseif (is_string($contentPart)) {
-                                $textPrompt .= $contentPart . "\n";
+        $lastException = null;
+        foreach ($apiKeys as $index => $apiKey) {
+            try {
+                if (str_starts_with($apiKey, 'AIzaSy') || str_starts_with($apiKey, 'AQ.')) {
+                    $textPrompt = '';
+                    foreach ($input as $msg) {
+                        if (isset($msg['content'])) {
+                            if (is_array($msg['content'])) {
+                                foreach ($msg['content'] as $contentPart) {
+                                    if (is_array($contentPart) && isset($contentPart['text'])) {
+                                        $textPrompt .= $contentPart['text'] . "\n";
+                                    } elseif (is_string($contentPart)) {
+                                        $textPrompt .= $contentPart . "\n";
+                                    }
+                                }
+                            } elseif (is_string($msg['content'])) {
+                                $textPrompt .= $msg['content'] . "\n";
                             }
                         }
-                    } elseif (is_string($msg['content'])) {
-                        $textPrompt .= $msg['content'] . "\n";
+                    }
+                    if (trim($textPrompt) === '') {
+                        $textPrompt = json_encode($input);
+                    }
+                    $res = $this->geminiJson($apiKey, $model, $textPrompt, $task);
+                    if ($res) {
+                        return $res;
+                    }
+                } else {
+                    $response = Http::timeout((int) config('cliptrend.openai.timeout', 900))
+                        ->withToken($apiKey)
+                        ->acceptJson()
+                        ->post('https://api.openai.com/v1/responses', [
+                            'model' => $model,
+                            'input' => $input,
+                            'temperature' => 0.2,
+                            'text' => ['format' => ['type' => 'json_object']],
+                            'store' => false,
+                        ]);
+
+                    if ($response->status() === 429) {
+                        Log::warning("OpenAI Key #{$index} exhausted (429), rotating...");
+                        continue;
+                    }
+
+                    if (! $response->successful()) {
+                        Log::warning('OpenAI JSON intelligence failed', ['task' => $task, 'status' => $response->status(), 'body' => $response->body()]);
+                        continue;
+                    }
+
+                    $payload = $response->json();
+                    $text = $payload['output_text'] ?? null;
+                    if (! $text && isset($payload['output'][0]['content'][0]['text'])) {
+                        $text = $payload['output'][0]['content'][0]['text'];
+                    }
+                    if (! is_string($text) || trim($text) === '') {
+                        continue;
+                    }
+
+                    $json = json_decode($text, true);
+                    if (is_array($json)) {
+                        return $json;
                     }
                 }
+            } catch (\Throwable $e) {
+                if ($e->getMessage() === "Gemini 429 Rate Limit Exceeded") {
+                    Log::warning("Gemini Key #{$index} exhausted (429), rotating...");
+                    continue;
+                }
+                $lastException = $e;
+                Log::warning("Intelligence failed with key #{$index}: " . $e->getMessage());
             }
-            if (trim($textPrompt) === '') {
-                $textPrompt = json_encode($input);
-            }
-            return $this->geminiJson($apiKey, $model, $textPrompt, $task);
         }
 
-        try {
-            $response = Http::timeout((int) config('cliptrend.openai.timeout', 900))
-                ->withToken($apiKey)
-                ->acceptJson()
-                ->post('https://api.openai.com/v1/responses', [
-                    'model' => $model,
-                    'input' => $input,
-                    'temperature' => 0.2,
-                    'text' => ['format' => ['type' => 'json_object']],
-                    'store' => false,
-                ]);
-
-            if (! $response->successful()) {
-                Log::warning('OpenAI JSON intelligence failed', ['task' => $task, 'status' => $response->status(), 'body' => $response->body()]);
-                return null;
-            }
-
-            $payload = $response->json();
-            $text = $payload['output_text'] ?? null;
-            if (! $text && isset($payload['output'][0]['content'][0]['text'])) {
-                $text = $payload['output'][0]['content'][0]['text'];
-            }
-            if (! is_string($text) || trim($text) === '') {
-                return null;
-            }
-
-            $json = json_decode($text, true);
-            return is_array($json) ? $json : null;
-        } catch (\Throwable $e) {
-            Log::warning('OpenAI JSON intelligence exception', ['task' => $task, 'error' => $e->getMessage()]);
-            return null;
-        }
+        return null;
     }
 
     private function geminiJson(string $apiKey, string $model, string $prompt, string $task): ?array
@@ -250,6 +276,9 @@ class TranscriptIntelligenceService
                 ]);
 
             if (! $response->successful()) {
+                if ($response->status() === 429) {
+                    throw new \RuntimeException("Gemini 429 Rate Limit Exceeded");
+                }
                 Log::warning('Gemini JSON intelligence failed', ['task' => $task, 'status' => $response->status(), 'body' => $response->body()]);
                 return null;
             }
@@ -263,6 +292,9 @@ class TranscriptIntelligenceService
             $json = json_decode($text, true);
             return is_array($json) ? $json : null;
         } catch (\Throwable $e) {
+            if ($e->getMessage() === "Gemini 429 Rate Limit Exceeded") {
+                throw $e;
+            }
             Log::warning('Gemini JSON intelligence exception', ['task' => $task, 'error' => $e->getMessage()]);
             return null;
         }

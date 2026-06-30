@@ -19,44 +19,12 @@ class OllamaProvider implements AiProviderInterface
     public function __construct(
         private readonly AudioExtractionService $audio,
         private readonly VideoSignalService $signals,
+        private readonly RealAiProvider $realAi,
     ) {}
 
     public function transcribe(UploadedVideo $video): array
     {
-        $audio = $this->audio->extractWav($video);
-        $transcript = null;
-
-        if ($audio) {
-            $transcript = $this->transcribeWithLocalWhisper($audio['absolute_path']);
-            if (! $transcript) {
-                $transcript = [
-                    'language' => config('cliptrend.transcription_language', 'id'),
-                    'text' => '',
-                    'segments' => [],
-                    'provider' => 'visual_only_transcription_unavailable',
-                    'raw_payload' => [
-                        'notice' => 'Transcription skipped because WHISPER_BIN is not configured or failed. Ollama requires text transcript for best results.',
-                    ],
-                ];
-            }
-        } else {
-            $transcript = [
-                'language' => config('cliptrend.transcription_language', 'id'),
-                'text' => '',
-                'segments' => [],
-                'provider' => 'visual_only_no_audio_stream',
-                'raw_payload' => ['notice' => 'No audio stream detected.'],
-            ];
-        }
-
-        $videoSignals = $this->signals->inspectSignals($video, $audio ? $audio['absolute_path'] : null);
-
-        return array_merge($transcript, [
-            'provider' => $transcript['provider'] ?? 'ollama_local_whisper',
-            'audio' => $audio ? Arr::except($audio, ['absolute_path']) : null,
-            'signals' => $videoSignals,
-            'source' => $audio ? 'ollama_uploaded_video_audio_transcript' : 'ollama_uploaded_video_visual_only',
-        ]);
+        return $this->realAi->transcribe($video);
     }
 
     public function classifyVideo(UploadedVideo $video, array $transcript): array
@@ -207,63 +175,7 @@ class OllamaProvider implements AiProviderInterface
         return null;
     }
 
-    private function transcribeWithLocalWhisper(string $audioAbsolutePath): ?array
-    {
-        $bin = config('cliptrend.whisper.bin') ?: env('WHISPER_BIN');
-        if (! $bin || (! str_contains($bin, DIRECTORY_SEPARATOR) && trim((string) shell_exec('command -v '.escapeshellarg($bin))) === '') || (str_contains($bin, DIRECTORY_SEPARATOR) && ! is_executable($bin))) {
-            return null;
-        }
 
-        $outputDir = dirname($audioAbsolutePath).'/whisper';
-        @mkdir($outputDir, 0775, true);
-
-        $language = config('cliptrend.whisper.language');
-        $process = new Process(array_filter([
-            $bin,
-            $audioAbsolutePath,
-            '--model', config('cliptrend.whisper.model', 'base'),
-            $language ? '--language' : null,
-            $language ?: null,
-            '--output_format', 'json',
-            '--output_dir', $outputDir,
-            '--fp16', config('cliptrend.whisper.fp16', false) ? 'True' : 'False',
-        ]));
-        $process->setTimeout(1800);
-        $process->run();
-
-        if (! $process->isSuccessful()) {
-            return null;
-        }
-
-        $jsonPath = $outputDir.'/'.pathinfo($audioAbsolutePath, PATHINFO_FILENAME).'.json';
-        if (! file_exists($jsonPath)) {
-            $matches = glob($outputDir.'/*.json') ?: [];
-            $jsonPath = $matches[0] ?? null;
-        }
-
-        if (! $jsonPath || ! file_exists($jsonPath)) {
-            return null;
-        }
-
-        $payload = json_decode(file_get_contents($jsonPath), true) ?: [];
-        $segments = collect($payload['segments'] ?? [])
-            ->map(fn ($segment) => [
-                'start' => round((float) ($segment['start'] ?? 0), 2),
-                'end' => round((float) ($segment['end'] ?? 0), 2),
-                'text' => trim((string) ($segment['text'] ?? '')),
-            ])
-            ->filter(fn ($segment) => $segment['end'] > $segment['start'] && $segment['text'] !== '')
-            ->values()
-            ->all();
-
-        return [
-            'language' => $payload['language'] ?? 'id',
-            'text' => trim((string) ($payload['text'] ?? collect($segments)->pluck('text')->implode(' '))),
-            'segments' => $segments,
-            'provider' => 'ollama_local_whisper',
-            'raw_payload' => Arr::except($payload, ['segments']),
-        ];
-    }
 
     private function normalizeClassification(array $classification): array
     {

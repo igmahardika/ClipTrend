@@ -51,8 +51,25 @@ class AnalyzeVideoJob implements ShouldQueue
         $video->update(['status' => 'analyzing']);
         $video->project->update(['status' => 'analyzing', 'niche_detection_status' => 'processing']);
 
-        $result = $analysis->analyze($video);
-        $clips->generate($result);
+        try {
+            $result = $analysis->analyze($video);
+            $clips->generate($result);
+        } catch (\Throwable $e) {
+            if (str_contains($e->getMessage(), '429') || str_contains(strtolower($e->getMessage()), 'rate limit') || str_contains(strtolower($e->getMessage()), 'exhausted')) {
+                Log::warning('Rate limit hit during video analysis. Releasing job back to queue.', [
+                    'uploaded_video_id' => $video->id,
+                    'error' => $e->getMessage()
+                ]);
+
+                // Reset statuses to let it retry cleanly
+                $video->update(['status' => 'normalized']);
+                $video->project->update(['status' => 'uploaded', 'niche_detection_status' => 'pending']);
+
+                $this->release(45); // retry after 45 seconds cooldown
+                return;
+            }
+            throw $e;
+        }
     }
 
     public function failed(\Throwable $exception): void

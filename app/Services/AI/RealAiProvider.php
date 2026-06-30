@@ -56,7 +56,7 @@ class RealAiProvider implements AiProviderInterface
             ];
         }
 
-        $videoSignals = $this->signals->inspectSignals($video);
+        $videoSignals = $this->signals->inspectSignals($video, $audio ? $audio['absolute_path'] : null);
 
         return array_merge($transcript, [
             'provider' => $transcript['provider'] ?? 'real',
@@ -93,32 +93,60 @@ class RealAiProvider implements AiProviderInterface
         return $segments;
     }
 
+    private function getApiKeys(): array
+    {
+        $keysStr = config('cliptrend.openai.api_key') ?: env('OPENAI_API_KEY') ?: '';
+        $keys = array_filter(array_map('trim', explode(',', $keysStr)));
+        return array_values($keys);
+    }
+
     private function transcribeWithOpenAi(string $audioAbsolutePath): ?array
     {
-        $apiKey = config('cliptrend.openai.api_key') ?: env('OPENAI_API_KEY');
-        if (! $apiKey) {
+        $apiKeys = $this->getApiKeys();
+        if (empty($apiKeys)) {
             return null;
         }
 
-        if (str_starts_with($apiKey, 'AIzaSy') || str_starts_with($apiKey, 'AQ.')) {
-            return $this->transcribeWithGemini($apiKey, $audioAbsolutePath);
+        $lastException = null;
+        foreach ($apiKeys as $index => $apiKey) {
+            try {
+                if (str_starts_with($apiKey, 'AIzaSy') || str_starts_with($apiKey, 'AQ.')) {
+                    $res = $this->transcribeWithGemini($apiKey, $audioAbsolutePath);
+                    if ($res) {
+                        return $res;
+                    }
+                } else {
+                    $response = Http::timeout((int) config('cliptrend.openai.timeout', 900))
+                        ->withToken($apiKey)
+                        ->attach('file', fopen($audioAbsolutePath, 'r'), basename($audioAbsolutePath))
+                        ->post('https://api.openai.com/v1/audio/transcriptions', [
+                            'model' => config('cliptrend.openai.transcription_model', 'whisper-1'),
+                            'response_format' => 'verbose_json',
+                            'language' => config('cliptrend.transcription_language', 'id'),
+                            'timestamp_granularities[]' => 'segment',
+                        ]);
+
+                    if ($response->status() === 429) {
+                        \Illuminate\Support\Facades\Log::warning("OpenAI Key #{$index} exhausted (429), rotating...");
+                        continue;
+                    }
+
+                    if (! $response->successful()) {
+                        throw new \RuntimeException('OpenAI transcription failed: '.$response->body());
+                    }
+
+                    return $this->normalizeTranscriptPayload($response->json() ?: [], 'openai');
+                }
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                \Illuminate\Support\Facades\Log::warning("Transcription failed with key #{$index}: " . $e->getMessage());
+            }
         }
 
-        $response = Http::timeout((int) config('cliptrend.openai.timeout', 900))
-            ->withToken($apiKey)
-            ->attach('file', fopen($audioAbsolutePath, 'r'), basename($audioAbsolutePath))
-            ->post('https://api.openai.com/v1/audio/transcriptions', [
-                'model' => config('cliptrend.openai.transcription_model', 'whisper-1'),
-                'response_format' => 'verbose_json',
-                'language' => config('cliptrend.transcription_language', 'id'),
-                'timestamp_granularities[]' => 'segment',
-            ]);
-
-        if (! $response->successful()) {
-            throw new \RuntimeException('OpenAI transcription failed: '.$response->body());
+        if ($lastException) {
+            throw $lastException;
         }
-
-        return $this->normalizeTranscriptPayload($response->json() ?: [], 'openai');
+        return null;
     }
 
     private function transcribeWithGemini(string $apiKey, string $audioAbsolutePath): ?array
@@ -161,6 +189,9 @@ Ensure every segment has precise start and end times matching the audio. No mark
                 ]);
 
             if (! $response->successful()) {
+                if ($response->status() === 429) {
+                    throw new \RuntimeException("Gemini 429 Rate Limit Exceeded");
+                }
                 \Illuminate\Support\Facades\Log::warning('Gemini transcription failed', ['status' => $response->status(), 'body' => $response->body()]);
                 return null;
             }
@@ -178,6 +209,9 @@ Ensure every segment has precise start and end times matching the audio. No mark
 
             return $this->normalizeTranscriptPayload($json, 'gemini');
         } catch (\Throwable $e) {
+            if ($e->getMessage() === "Gemini 429 Rate Limit Exceeded") {
+                throw $e;
+            }
             \Illuminate\Support\Facades\Log::warning('Gemini transcription exception', ['error' => $e->getMessage()]);
             return null;
         }
