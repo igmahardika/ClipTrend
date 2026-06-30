@@ -69,5 +69,13 @@ echo -e "   Admin: http://127.0.0.1:8000/admin/dashboard"
 echo -e "${YELLOW}   Ctrl+C untuk berhenti.${NC}"
 echo ""
 
+# Trap to automatically kill the background queue worker when the script exits
+trap 'echo -e "${YELLOW}🛑 Stopping background queue worker...${NC}"; kill $(jobs -p) 2>/dev/null || true; exit' INT TERM EXIT
+
+echo -e "${CYAN}→ Menjalankan background queue worker...${NC}"
+php -c php-local.ini artisan queue:work --queue=analysis,rendering,default --tries=3 --timeout=1800 > storage/logs/queue-worker.log 2>&1 &
+echo -e "${GREEN}✓ Queue worker siap (logging ke storage/logs/queue-worker.log)${NC}"
+echo ""
+
 export PHP_CLI_SERVER_WORKERS=6
 php -c php-local.ini -S 127.0.0.1:8000 -t public
