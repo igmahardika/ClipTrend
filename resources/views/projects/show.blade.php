@@ -8,7 +8,7 @@
     $topClip = $project->clips->sortByDesc('viral_score')->first();
     $renderingJobs = $project->renderJobs->whereIn('status', ['pending','processing']);
 @endphp
-
+<div x-data="projectStatusPoller({{ $project->id }}, '{{ $video?->status ?? 'waiting' }}', '{{ $project->niche_detection_status ?? 'waiting' }}')">
 <div class="mb-5 flex flex-wrap items-center justify-between gap-4">
     <a href="{{ route('projects.index') }}" class="ct-button-ghost">← Kembali ke Projects</a>
     <div class="flex flex-wrap items-center gap-3">
@@ -207,9 +207,14 @@
             @else
                 <div class="ct-table-row flex gap-4"><span class="text-sm font-black text-slate-500">01</span><p class="text-sm leading-6 text-slate-400">Belum ada sinyal. Upload video untuk memulai niche scan.</p></div>
             @endif
-            <form method="POST" action="{{ route('projects.analyze', $project) }}" class="mt-5 flex flex-wrap gap-3">@csrf
+            <form method="POST" action="{{ route('projects.analyze', $project) }}" class="mt-5 flex flex-wrap gap-3" @submit="isScanning = true">@csrf
                 @if($video?->isReadyForAnalysis())
-                    <button class="ct-button-secondary">Run Niche Scan</button>
+                    <button class="ct-button-secondary" :disabled="isScanning">
+                        <span x-show="!isScanning">Run Niche Scan</span>
+                        <span x-show="isScanning" class="flex items-center gap-2">
+                            <span class="inline-block animate-spin">⏳</span> Scanning Niche...
+                        </span>
+                    </button>
                 @else
                     <button class="ct-button-ghost" type="button" disabled>Upload video dulu untuk menjalankan niche scan</button>
                 @endif
@@ -353,4 +358,5 @@
         </div>
     </aside>
 </section>
+</div>
 @endsection

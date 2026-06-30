@@ -20,6 +20,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::resource('projects', VideoProjectController::class);
     Route::post('/projects/{project}/upload', [VideoUploadController::class, 'store'])->middleware('throttle:uploads')->name('projects.upload');
+    Route::get('/projects/{project}/status', [App\Http\Controllers\Api\ProjectStatusController::class, 'project'])->name('projects.status');
     Route::post('/projects/{project}/analyze', [ProjectAnalysisController::class, 'store'])->name('projects.analyze');
     Route::post('/projects/{project}/clips/{clip}/subtitles', [SubtitleController::class, 'update'])->name('clips.subtitles.update');
     Route::post('/projects/{project}/clips/{clip}/render', [RenderController::class, 'store'])->name('clips.render');

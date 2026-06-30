@@ -116,4 +116,61 @@ window.renderJobPoller = function (jobId, initialStatus) {
     };
 };
 
+/**
+ * projectStatusPoller — Alpine.js component untuk auto-refresh halaman detail project
+ * saat proses analisis video (transkrip) atau niche scan sedang berjalan.
+ */
+window.projectStatusPoller = function (projectId, initialVideoStatus, initialNicheStatus) {
+    return {
+        projectId: projectId,
+        videoStatus: initialVideoStatus,
+        nicheStatus: initialNicheStatus,
+        isScanning: false,
+        interval: null,
+
+        init() {
+            if (this.videoStatus === 'analyzing' || this.nicheStatus === 'processing') {
+                this.isScanning = true;
+                this.startPolling();
+            }
+        },
+
+        startPolling() {
+            if (this.interval) clearInterval(this.interval);
+            this.interval = setInterval(() => this.poll(), 3000);
+        },
+
+        async poll() {
+            try {
+                const response = await fetch('/projects/' + this.projectId + '/status');
+                if (!response.ok) return;
+                const data = await response.json();
+
+                const newVideoStatus = data.video ? data.video.status : 'waiting';
+                const newNicheStatus = data.project.niche_detection_status;
+
+                // Jika analisis video selesai atau niche scan selesai, muat ulang halaman
+                if (
+                    (this.videoStatus === 'analyzing' && newVideoStatus !== 'analyzing') ||
+                    (this.nicheStatus === 'processing' && newNicheStatus !== 'processing') ||
+                    (newNicheStatus === 'completed' && this.nicheStatus !== 'completed')
+                ) {
+                    clearInterval(this.interval);
+                    window.location.reload();
+                    return;
+                }
+
+                this.videoStatus = newVideoStatus;
+                this.nicheStatus = newNicheStatus;
+            } catch (e) {
+                // silently ignore
+            }
+        },
+
+        destroy() {
+            if (this.interval) clearInterval(this.interval);
+        }
+    };
+};
+
 Alpine.start();
