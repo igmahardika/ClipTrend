@@ -188,8 +188,20 @@
             </div>
             <div>
                 <p class="ct-eyebrow">Detected Niche</p>
-                <h3 class="mt-1 text-2xl font-black tracking-[-0.04em] text-white">{{ $primaryNiche?->name ?: 'Belum ada video dianalisis' }}</h3>
-                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{{ $primaryNiche?->reasoning ?: 'Upload video, lalu sistem akan membaca sinyal dari transcript, visual cue, audio cue, metadata, dan trend context sebelum proses rendering.' }}</p>
+                <h3 class="mt-1 text-2xl font-black tracking-[-0.04em] text-white">
+                    @if($video?->status === 'analyzing')
+                        ⏳ Sedang Menganalisis Video...
+                    @else
+                        {{ $primaryNiche?->name ?: 'Belum ada video dianalisis' }}
+                    @endif
+                </h3>
+                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                    @if($video?->status === 'analyzing')
+                        Proses transkripsi audio offline (Whisper) dan ekstraksi sinyal AI sedang berjalan secara otomatis di latar belakang. Mohon tunggu, halaman akan memuat ulang secara otomatis begitu hasil siap.
+                    @else
+                        {{ $primaryNiche?->reasoning ?: 'Upload video, lalu sistem akan membaca sinyal dari transcript, visual cue, audio cue, metadata, dan trend context sebelum proses rendering.' }}
+                    @endif
+                </p>
             </div>
         </div>
         <div class="grid gap-3 px-5 pb-5 md:grid-cols-3">
@@ -198,7 +210,12 @@
             <div class="ct-soft-card"><span class="text-xs font-bold text-slate-500">Render Readiness</span><strong class="mt-2 block text-white">{{ $primaryNiche ? 'Ready' : 'Not Ready' }}</strong><p class="mt-2 text-xs leading-5 text-slate-400">Render ideal dilakukan setelah niche terkunci.</p></div>
         </div>
         <div class="px-5 pb-5">
-            @if($primaryNiche && $primaryNiche->signals)
+            @if($video?->status === 'analyzing')
+                <div class="ct-table-row flex gap-4 border-lime-300/20 bg-lime-300/5 animate-pulse">
+                    <span class="text-sm font-black text-lime-300">⏳</span>
+                    <p class="text-sm leading-6 text-slate-300">Mengekstrak transkrip audio, memetakan sinyal konten, dan menghitung skor viral... (Sedang berjalan otomatis)</p>
+                </div>
+            @elseif($primaryNiche && $primaryNiche->signals)
                 <div class="grid gap-3">
                     @foreach($primaryNiche->signals as $i => $signal)
                         <div class="ct-table-row flex gap-4"><span class="text-sm font-black text-lime-300">{{ str_pad($i+1, 2, '0', STR_PAD_LEFT) }}</span><p class="text-sm leading-6 text-slate-300">{{ $signal }}</p></div>
@@ -208,7 +225,11 @@
                 <div class="ct-table-row flex gap-4"><span class="text-sm font-black text-slate-500">01</span><p class="text-sm leading-6 text-slate-400">Belum ada sinyal. Upload video untuk memulai niche scan.</p></div>
             @endif
             <form method="POST" action="{{ route('projects.analyze', $project) }}" class="mt-5 flex flex-wrap gap-3" @submit="isScanning = true">@csrf
-                @if($video?->isReadyForAnalysis())
+                @if($video?->status === 'analyzing')
+                    <button class="ct-button-secondary" type="button" disabled>
+                        <span class="inline-block animate-spin mr-1">⏳</span> Menganalisis Video...
+                    </button>
+                @elseif($video?->isReadyForAnalysis())
                     <button class="ct-button-secondary" :disabled="isScanning">
                         <span x-show="!isScanning">Run Niche Scan</span>
                         <span x-show="isScanning" class="flex items-center gap-2">
@@ -326,7 +347,15 @@
                     @endif
                 </div>
             @empty
-                <x-empty-state title="Clip belum tersedia" description="Setelah analisis selesai, AI Director akan membuat kandidat clip terbaik." />
+                @if($video?->status === 'analyzing')
+                    <div class="rounded-[22px] border border-lime-300/20 bg-lime-300/5 p-8 text-center animate-pulse">
+                        <span class="text-3xl block">⏳</span>
+                        <h3 class="mt-3 text-lg font-black text-white">Menunggu Analisis Video Selesai</h3>
+                        <p class="mt-2 text-sm leading-6 text-slate-400">AI Director akan memotong video menjadi klip-klip viral secara otomatis begitu transkrip siap.</p>
+                    </div>
+                @else
+                    <x-empty-state title="Clip belum tersedia" description="Setelah analisis selesai, AI Director akan membuat kandidat clip terbaik." />
+                @endif
             @endforelse
         </div>
     </div>
