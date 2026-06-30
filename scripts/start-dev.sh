@@ -69,4 +69,5 @@ echo -e "   Admin: http://127.0.0.1:8000/admin/dashboard"
 echo -e "${YELLOW}   Ctrl+C untuk berhenti.${NC}"
 echo ""
 
+export PHP_CLI_SERVER_WORKERS=6
 php -c php-local.ini -S 127.0.0.1:8000 -t public
