@@ -1,0 +1,72 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8080
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: cliptrend
+      DB_USERNAME: cliptrend
+      DB_PASSWORD: cliptrend
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      FFMPEG_BIN: /usr/bin/ffmpeg
+      FFPROBE_BIN: /usr/bin/ffprobe
+      AI_PROVIDER: real
+      TREND_PROVIDER: youtube
+      NORMALIZE_ON_UPLOAD: "true"
+    volumes:
+      - .:/var/www/html
+      - cliptrend_storage:/var/www/html/storage
+    depends_on:
+      - mysql
+      - redis
+  queue:
+    build: .
+    command: php artisan queue:work redis --queue=analysis,rendering,default --timeout=3600 --tries=3
+    environment:
+      APP_ENV: local
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: cliptrend
+      DB_USERNAME: cliptrend
+      DB_PASSWORD: cliptrend
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      FFMPEG_BIN: /usr/bin/ffmpeg
+      FFPROBE_BIN: /usr/bin/ffprobe
+      AI_PROVIDER: real
+      NORMALIZE_ON_UPLOAD: "true"
+    volumes:
+      - .:/var/www/html
+      - cliptrend_storage:/var/www/html/storage
+    depends_on:
+      - app
+      - mysql
+      - redis
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: cliptrend
+      MYSQL_USER: cliptrend
+      MYSQL_PASSWORD: cliptrend
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "33060:3306"
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "63790:6379"
+volumes:
+  mysql_data:
+  cliptrend_storage:

@@ -1,0 +1,4 @@
+@extends('layouts.app', ['pageTitle' => 'User Management'])
+@section('content')
+<div class="ct-panel overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-white/5 text-xs uppercase text-slate-500"><tr><th class="p-4">User</th><th>Role</th><th>Projects</th><th>Limit</th><th>Status</th><th></th></tr></thead><tbody class="divide-y divide-white/10">@foreach($users as $user)<tr><td class="p-4"><div class="font-semibold text-white">{{ $user->name }}</div><div class="text-slate-500">{{ $user->email }}</div></td><td>{{ $user->roles->pluck('name')->join(', ') }}</td><td>{{ $user->projects_count }}</td><td>{{ $user->upload_limit_mb }} MB</td><td><x-status-badge :status="$user->status"/></td><td><a href="{{ route('admin.users.edit', $user) }}" class="text-cyan-300">Edit</a></td></tr>@endforeach</tbody></table></div><div class="mt-6">{{ $users->links() }}</div>
+@endsection

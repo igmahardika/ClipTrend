@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --ct-bg: #070910;
+    --ct-panel: rgba(255,255,255,0.065);
+    --ct-panel-strong: rgba(255,255,255,0.105);
+    --ct-line: rgba(255,255,255,0.11);
+    --ct-text: #f8fafc;
+    --ct-muted: #9aa4b2;
+    --ct-muted-2: #687386;
+    --ct-brand: #b6ff4a;
+    --ct-brand-2: #7cf7ff;
+    --ct-danger: #ff6b6b;
+    --ct-warn: #ffd166;
+    --ct-ok: #72f7a1;
+    --ct-shadow: 0 24px 80px rgba(0,0,0,0.45);
+    --ct-radius: 24px;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    @apply min-h-screen text-slate-100 antialiased;
+    background:
+      radial-gradient(circle at 12% 8%, rgba(182,255,74,0.18), transparent 28%),
+      radial-gradient(circle at 90% 8%, rgba(124,247,255,0.16), transparent 30%),
+      radial-gradient(circle at 50% 88%, rgba(108,92,231,0.14), transparent 34%),
+      var(--ct-bg);
+  }
+}
+
+@layer components {
+  .ct-shell { @apply relative grid min-h-screen lg:grid-cols-[292px_minmax(0,1fr)]; }
+  .ct-sidebar { @apply sticky top-0 hidden h-screen border-r border-white/10 bg-black/40 px-5 py-7 backdrop-blur-2xl lg:block; }
+  .ct-brand { @apply mb-9 flex items-center gap-4; }
+  .ct-brand-mark { @apply grid h-12 w-12 place-items-center rounded-[17px] text-base font-black text-slate-950 shadow-xl; background: linear-gradient(135deg, var(--ct-brand), var(--ct-brand-2)); box-shadow: 0 14px 45px rgba(182,255,74,0.20); }
+  .ct-brand-title { @apply text-lg font-black tracking-[-0.04em] text-white; }
+  .ct-brand-subtitle { @apply mt-0.5 text-xs text-slate-400; }
+  .ct-nav { @apply grid gap-2; }
+  .ct-nav-item { @apply flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm font-bold text-slate-400 transition hover:bg-white/[0.08] hover:text-white; }
+  .ct-nav-item-active { @apply bg-white/[0.08] text-white; }
+  .ct-nav-icon { @apply w-5 text-lime-300; }
+  .ct-sidebar-card { @apply absolute bottom-6 left-5 right-5 rounded-[22px] border border-white/10 bg-gradient-to-b from-white/[0.09] to-white/[0.035] p-4; }
+  .ct-main { @apply min-w-0 overflow-hidden px-4 py-6 lg:px-7; }
+  .ct-topbar { @apply mb-6 flex flex-col gap-5 rounded-[24px] border border-white/10 bg-gradient-to-br from-white/[0.09] to-white/[0.035] p-5 shadow-2xl shadow-black/40 backdrop-blur-2xl md:flex-row md:items-start md:justify-between; }
+  .ct-topbar h1 { @apply mt-2 max-w-5xl text-3xl font-black leading-[0.98] tracking-[-0.075em] text-white md:text-5xl; }
+  .ct-eyebrow { @apply text-[11px] font-black uppercase tracking-[0.12em] text-lime-300; }
+  .ct-panel { @apply rounded-[24px] border border-white/10 bg-white/[0.065] shadow-2xl shadow-black/40 backdrop-blur-2xl; }
+  .ct-card { @apply rounded-[24px] border border-white/10 bg-white/[0.065] p-5 shadow-2xl shadow-black/30 backdrop-blur-2xl transition; }
+  .ct-soft-card { @apply rounded-[22px] border border-white/10 bg-white/[0.04] p-4; }
+  .ct-panel-header { @apply flex items-start justify-between gap-5 p-5 pb-0; }
+  .ct-panel-title { @apply mt-1 text-xl font-black tracking-[-0.035em] text-white; }
+  .ct-button { @apply inline-flex items-center justify-center gap-2 rounded-[14px] px-4 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5; background: linear-gradient(135deg, var(--ct-brand), var(--ct-brand-2)); box-shadow: 0 14px 45px rgba(182,255,74,0.14); }
+  .ct-button-secondary { @apply inline-flex items-center justify-center gap-2 rounded-[14px] border border-lime-300/20 bg-lime-300/10 px-4 py-3 text-sm font-black text-lime-300 transition hover:-translate-y-0.5 hover:bg-lime-300/15; }
+  .ct-button-ghost { @apply inline-flex items-center justify-center gap-2 rounded-[14px] border border-white/10 bg-transparent px-4 py-3 text-sm font-bold text-slate-400 transition hover:bg-white/10 hover:text-white; }
+  .ct-input { @apply w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-lime-300 focus:ring-lime-300/30; }
+  .ct-pill { @apply inline-flex items-center justify-center rounded-full border border-white/10 px-3 py-1.5 text-xs font-black text-slate-400; }
+  .ct-pill-safe { @apply border-emerald-300/20 bg-emerald-300/10 text-emerald-300; }
+  .ct-pill-brand { @apply border-lime-300/25 bg-lime-300/10 text-lime-300; }
+  .ct-pill-warn { @apply border-yellow-300/25 bg-yellow-300/10 text-yellow-200; }
+  .ct-phone { @apply relative mx-auto aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-[32px] border border-white/10 bg-slate-950 p-3 shadow-2xl shadow-black/50; }
+  .ct-phone-screen { @apply relative flex h-full flex-col justify-between overflow-hidden rounded-[24px] border border-white/10 bg-gradient-to-b from-slate-800 via-slate-950 to-black p-5; }
+  .ct-progress-track { @apply h-1.5 overflow-hidden rounded-full bg-white/10; }
+  .ct-progress-fill { @apply h-full rounded-full; background: linear-gradient(135deg, var(--ct-brand), var(--ct-brand-2)); }
+  .ct-score-ring { @apply grid h-28 w-28 shrink-0 place-items-center rounded-full border border-lime-300/25 bg-lime-300/10 text-center; box-shadow: inset 0 0 30px rgba(182,255,74,.08); }
+  .ct-grid-hero { @apply grid gap-5 xl:grid-cols-[0.9fr_1.1fr]; }
+  .ct-grid-two { @apply grid gap-5 xl:grid-cols-[1.15fr_0.85fr]; }
+  .ct-grid-editor { @apply grid gap-5 xl:grid-cols-[0.95fr_1.05fr]; }
+  .ct-dropzone { @apply m-5 grid min-h-[300px] cursor-pointer place-items-center rounded-[22px] border border-dashed border-white/20 bg-black/20 p-8 text-center transition hover:border-lime-300 hover:bg-lime-300/[0.055]; }
+  .ct-drop-icon { @apply mx-auto mb-4 grid h-14 w-14 place-items-center rounded-[22px] border border-lime-300/20 bg-lime-300/10 text-3xl font-normal text-lime-300; }
+  .ct-video-stage { @apply relative m-5 h-[390px] overflow-hidden rounded-[22px] border border-white/10 bg-black; }
+  .ct-video-stage video { @apply h-full w-full bg-black object-contain; }
+  .ct-empty-video { @apply absolute inset-0 grid place-items-center content-center gap-3 text-slate-400; }
+  .ct-meta-grid { @apply grid grid-cols-1 gap-3 px-5 pb-5 md:grid-cols-3; }
+  .ct-meta-item { @apply rounded-[18px] border border-white/10 bg-white/[0.04] p-4; }
+  .ct-table-row { @apply rounded-2xl border border-white/10 bg-white/[0.04] p-4; }
+}

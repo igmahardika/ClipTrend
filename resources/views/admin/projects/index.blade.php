@@ -1,0 +1,4 @@
+@extends('layouts.app', ['pageTitle' => 'All Projects'])
+@section('content')
+<div class="ct-panel overflow-hidden"><table class="w-full text-left text-sm"><thead class="bg-white/5 text-xs uppercase text-slate-500"><tr><th class="p-4">Project</th><th>User</th><th>Status</th><th>Render Jobs</th><th></th></tr></thead><tbody class="divide-y divide-white/10">@foreach($projects as $project)<tr><td class="p-4"><div class="font-semibold text-white">{{ $project->title }}</div><div class="text-slate-500">{{ $project->created_at->format('d M Y H:i') }}</div></td><td>{{ $project->user->email }}</td><td><x-status-badge :status="$project->status"/></td><td>{{ $project->renderJobs->count() }}</td><td><a href="{{ route('admin.projects.show', $project) }}" class="text-cyan-300">View</a></td></tr>@endforeach</tbody></table></div><div class="mt-6">{{ $projects->links() }}</div>
+@endsection
