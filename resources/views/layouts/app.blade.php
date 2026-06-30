@@ -58,9 +58,16 @@
                 <p class="ct-eyebrow">Smart Repurposing Platform</p>
                 <h1>{{ $pageTitle ?? 'Ubah video panjang menjadi Shorts, TikTok, dan Reels yang siap upload.' }}</h1>
             </div>
-            <div class="flex flex-wrap gap-3 md:flex-nowrap">
+            <div class="flex items-center gap-4">
                 <a href="{{ route('projects.create') }}" class="ct-button">New Project</a>
-                <form method="POST" action="{{ route('logout') }}">@csrf<button class="ct-button-ghost">Logout</button></form>
+                <form method="POST" action="{{ route('logout') }}" title="Logout">
+                    @csrf
+                    <button class="flex h-12 w-12 items-center justify-center rounded-[16px] bg-white/5 text-slate-400 border border-white/5 transition-all duration-300 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
+                    </button>
+                </form>
             </div>
         </header>
 

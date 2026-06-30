@@ -11,7 +11,11 @@
         </div>
         <div class="ct-dropzone">
             <div>
-                <div class="ct-drop-icon">+</div>
+                <div class="ct-drop-icon">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                    </svg>
+                </div>
                 <h3 class="text-xl font-black tracking-[-0.04em] text-white">Mulai project video panjang</h3>
                 <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">Buat project, upload MP4/MOV/WebM, lalu sistem menjalankan niche scan, AI director, subtitle, dan render queue.</p>
                 <a href="{{ route('projects.create') }}" class="ct-button-secondary mt-5">Create New Project</a>

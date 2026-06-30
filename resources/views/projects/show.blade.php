@@ -46,7 +46,11 @@
                   x-data="uploadProgress()" @submit="startUpload">
                 @csrf
                 <div>
-                    <div class="ct-drop-icon">+</div>
+                    <div class="ct-drop-icon">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                    </div>
                     <h3 class="text-xl font-black tracking-[-0.04em] text-white">Upload video sebagai alternatif</h3>
                     <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">Atau aktifkan YouTube ingestion di .env, lalu buat project baru dengan URL YouTube.</p>
                     <input type="file" name="video" required accept="video/*" class="ct-input mt-5"
@@ -79,7 +83,11 @@
                   x-data="uploadProgress()" @submit="startUpload">
                 @csrf
                 <div>
-                    <div class="ct-drop-icon">+</div>
+                    <div class="ct-drop-icon">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                    </div>
                     <h3 class="text-xl font-black tracking-[-0.04em] text-white">Drop video panjang di sini</h3>
                     <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">MP4, MOV, MKV, WebM. Setelah upload, sistem menjalankan metadata extraction dan AI analysis queue.</p>
                     <input type="file" name="video" required accept="video/*" class="ct-input mt-5"
@@ -219,13 +227,19 @@
         </div>
         <div class="space-y-3 p-5">
             @forelse($project->detectedNiches as $niche)
-                <div class="ct-table-row {{ $niche->is_primary ? 'border-lime-300/30 bg-lime-300/10' : '' }}">
+                <div class="ct-table-row relative overflow-hidden {{ $niche->is_primary ? 'border-lime-300/30 bg-lime-300/10' : '' }}">
                     <div class="flex items-center justify-between gap-4">
                         <div>
                             <strong class="text-white">{{ $niche->name }}</strong>
                             <p class="mt-1 text-xs leading-5 text-slate-400">{{ $niche->reasoning }}</p>
                         </div>
                         <span class="ct-pill {{ $niche->is_primary ? 'ct-pill-brand' : '' }}">{{ (int) $niche->confidence_score }}%</span>
+                    </div>
+                    <!-- Horizontal Micro Progress Bar (2px height) -->
+                    <div class="absolute bottom-0 left-0 right-0 h-[2px] bg-white/5">
+                        <div class="h-full transition-all duration-500" 
+                             style="width: {{ $niche->confidence_score }}%; background: {{ $niche->is_primary ? 'linear-gradient(90deg, #c0ff3e, #00f0ff)' : 'rgba(255,255,255,0.15)' }}">
+                        </div>
                     </div>
                 </div>
             @empty
@@ -289,10 +303,16 @@
                             <summary class="cursor-pointer text-sm font-black text-lime-300">Subtitle Editor</summary>
                             <form method="POST" action="{{ route('clips.subtitles.update', [$project, $clip]) }}" class="mt-4 space-y-2">@csrf
                                 @foreach($clip->subtitle->segments ?? [] as $i => $seg)
-                                    <div class="grid gap-2 md:grid-cols-[90px_90px_1fr]">
-                                        <input name="segments[{{ $i }}][start]" value="{{ $seg['start'] }}" class="ct-input">
-                                        <input name="segments[{{ $i }}][end]" value="{{ $seg['end'] }}" class="ct-input">
-                                        <input name="segments[{{ $i }}][text]" value="{{ $seg['text'] }}" class="ct-input">
+                                    <div class="grid gap-2 md:grid-cols-[110px_110px_1fr] p-2.5 rounded-xl bg-white/[0.02] border border-white/5 transition-all duration-300 hover:bg-white/[0.04] hover:border-lime-400/20">
+                                        <div class="flex items-center gap-1.5 px-2 bg-white/5 rounded-lg border border-white/5 h-11">
+                                            <span class="text-[9px] uppercase font-bold text-slate-500">In</span>
+                                            <input name="segments[{{ $i }}][start]" value="{{ $seg['start'] }}" class="w-full bg-transparent text-xs font-mono text-lime-400 focus:outline-none">
+                                        </div>
+                                        <div class="flex items-center gap-1.5 px-2 bg-white/5 rounded-lg border border-white/5 h-11">
+                                            <span class="text-[9px] uppercase font-bold text-slate-500">Out</span>
+                                            <input name="segments[{{ $i }}][end]" value="{{ $seg['end'] }}" class="w-full bg-transparent text-xs font-mono text-lime-400 focus:outline-none">
+                                        </div>
+                                        <input name="segments[{{ $i }}][text]" value="{{ $seg['text'] }}" class="w-full bg-white/5 border border-white/5 rounded-lg px-3 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-lime-400 focus:bg-white/[0.08] focus:ring-2 focus:ring-lime-400/20 h-11">
                                     </div>
                                 @endforeach
                                 <button class="ct-button-secondary">Save Subtitle</button>
