@@ -46,6 +46,31 @@ echo ""
 echo -e "  AI Provider  : ${GREEN}${AI_PROVIDER:-real}${NC}"
 echo -e "  Queue Mode   : ${GREEN}${QUEUE_CONNECTION:-sync}${NC}"
 
+# Check and auto-start Ollama if provider is ollama
+if [ "${AI_PROVIDER:-real}" = "ollama" ]; then
+    echo -e "${CYAN}→ Memeriksa status Ollama...${NC}"
+    if ! curl -s -f http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+        echo -e "${YELLOW}⚠  Ollama tidak aktif di port 11434. Mencoba memulai secara otomatis...${NC}"
+        if command -v ollama &>/dev/null; then
+            ollama serve >/dev/null 2>&1 &
+            sleep 3
+            if curl -s -f http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+                echo -e "  Ollama       : ${GREEN}online (auto-started) ✓${NC}"
+            else
+                echo -e "  Ollama       : ${RED}gagal diaktifkan secara otomatis. Harap buka aplikasi Ollama secara manual.${NC}"
+            fi
+        elif [ -d "/Applications/Ollama.app" ]; then
+            open -a Ollama
+            sleep 5
+            echo -e "  Ollama       : ${GREEN}online (Ollama.app dibuka) ✓${NC}"
+        else
+            echo -e "  Ollama       : ${RED}tidak terdeteksi. Silakan unduh dan jalankan Ollama manual.${NC}"
+        fi
+    else
+        echo -e "  Ollama       : ${GREEN}online ✓${NC}"
+    fi
+fi
+
 # Check Whisper
 if command -v whisper &>/dev/null; then
     MODELS=$(ls ~/.cache/whisper/*.pt 2>/dev/null | xargs -I{} basename {} .pt | tr '\n' ' ')
