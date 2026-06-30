@@ -56,8 +56,43 @@ class FfmpegVideoRenderer implements VideoRendererInterface
         $overlayDir = storage_path('app/tmp/render-overlay-'.$job->id);
         @mkdir($overlayDir, 0775, true);
 
-        $vf = $this->videoFilter($options, $renderAssPath, $subtitleSegments, $hookText, (float) $clip->duration_seconds, $overlayDir);
         $ffmpeg = config('cliptrend.ffmpeg_path', 'ffmpeg');
+        
+        $mode = $options['crop_mode'] ?? config('cliptrend.default_crop_mode', 'fit_blur');
+        
+        if ($mode === 'smart_crop') {
+            $smartCropOutput = storage_path('app/tmp/smartcrop-'.$job->id.'.mp4');
+            $segmentInput = storage_path('app/tmp/segment-'.$job->id.'.mp4');
+            
+            // 1. Cut the segment first
+            $cutProcess = new Process([
+                $ffmpeg, '-hide_banner', '-y', 
+                '-ss', (string) max(0, (float) $clip->start_time), 
+                '-i', $input, 
+                '-t', (string) max(1, (float) $clip->duration_seconds), 
+                '-c:v', 'copy', '-c:a', 'copy', $segmentInput
+            ]);
+            $cutProcess->run();
+            
+            // 2. Run Python Smart Crop
+            $pythonProcess = new Process([
+                '/usr/bin/python3', base_path('scripts/smart_crop.py'), $segmentInput, $smartCropOutput
+            ]);
+            $pythonProcess->setTimeout(1800);
+            $pythonProcess->run();
+            
+            if ($pythonProcess->isSuccessful() && file_exists($smartCropOutput)) {
+                $input = $smartCropOutput;
+                $clip->start_time = 0; // Segment is already cut
+                $options['crop_mode'] = 'smart_crop_applied'; // Prevent videoFilter from doing static crop again
+            } else {
+                Log::error('Smart crop failed, falling back', ['error' => $pythonProcess->getErrorOutput()]);
+                $options['crop_mode'] = 'center_crop';
+            }
+        }
+
+        $vf = $this->videoFilter($options, $renderAssPath, $subtitleSegments, $hookText, (float) $clip->duration_seconds, $overlayDir);
+
         $cwd = $this->supportsAssFilter() ? dirname($renderAssPath) : null;
 
         $process = new Process([
@@ -120,6 +155,7 @@ class FfmpegVideoRenderer implements VideoRendererInterface
     {
         $mode = $options['crop_mode'] ?? config('cliptrend.default_crop_mode', 'fit_blur');
         $base = match ($mode) {
+            'smart_crop_applied' => 'setsar=1,fps=30',
             'center_crop', 'smart_crop' => 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30',
             'fit_blur' => 'split=2[main][bg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=26,eq=brightness=-0.05:saturation=0.9[blur];[main]scale=1080:1920:force_original_aspect_ratio=decrease[fg];[blur][fg]overlay=(W-w)/2:(H-h)/2,setsar=1,fps=30',
             default => 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30',

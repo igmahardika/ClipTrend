@@ -316,7 +316,13 @@
                             @php($renderHashtags = $recommendation?->content['hashtags'] ?? [])
                             @forelse($renderHashtags as $tag)<input type="hidden" name="hashtags[]" value="{{ $tag }}">@empty<input type="hidden" name="hashtags[]" value="#shortsindonesia">@endforelse
                             <input type="hidden" name="hook_text" value="{{ $clip->hook_text }}">
-                            <input type="hidden" name="options[crop_mode]" value="{{ config('cliptrend.default_crop_mode', 'fit_blur') }}">
+                            <label class="mt-3 block text-xs font-bold text-slate-400">Crop Mode
+                                <select name="options[crop_mode]" class="ct-input mt-1">
+                                    <option value="smart_crop" selected>Smart Crop (AI Face Tracking)</option>
+                                    <option value="fit_blur">Fit & Blur Background</option>
+                                    <option value="center_crop">Static Center Crop</option>
+                                </select>
+                            </label>
                             @if($video && $video->status !== 'pending_ingest')
                                 <button class="ct-button mt-4 w-full">Render Clip</button>
                             @else
