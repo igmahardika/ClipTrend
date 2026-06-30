@@ -43,6 +43,11 @@ class AnalyzeVideoJob implements ShouldQueue
             return;
         }
 
+        if ($video->status === 'analyzed') {
+            Log::info('Video already analyzed, skipping redundant AnalyzeVideoJob.', ['video_id' => $video->id]);
+            return;
+        }
+
         $video->update(['status' => 'analyzing']);
         $video->project->update(['status' => 'analyzing', 'niche_detection_status' => 'processing']);
 
