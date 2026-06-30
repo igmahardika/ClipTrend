@@ -49,7 +49,7 @@ class OllamaProvider implements AiProviderInterface
             ];
         }
 
-        $videoSignals = $this->signals->inspectSignals($video);
+        $videoSignals = $this->signals->inspectSignals($video, $audio ? $audio['absolute_path'] : null);
 
         return array_merge($transcript, [
             'provider' => $transcript['provider'] ?? 'ollama_local_whisper',
@@ -92,16 +92,33 @@ class OllamaProvider implements AiProviderInterface
         if (! $windows) {
             return [];
         }
+        
+        $multimodal = $analysis->raw_payload['transcript']['signals']['multimodal'] ?? [];
+        $audioEnergy = $multimodal['audio']['audio_energy'] ?? [];
+        $motionEnergy = $multimodal['video']['motion_energy'] ?? [];
 
-        $candidates = collect($windows)->sortByDesc('score')->take(10)->values()->map(fn ($w, $i) => [
-            'id' => $i + 1,
-            'start' => $w['start'],
-            'end' => $w['end'],
-            'duration' => $w['duration'],
-            'text' => Str::limit($w['text'], 800, ''),
-        ])->all();
+        $candidates = collect($windows)->sortByDesc('score')->take(10)->values()->map(function($w, $i) use ($audioEnergy, $motionEnergy) {
+            $startSec = intval($w['start']);
+            $endSec = intval($w['end']);
+            
+            $ae = array_slice($audioEnergy, $startSec, max(1, $endSec - $startSec));
+            $me = array_slice($motionEnergy, $startSec, max(1, $endSec - $startSec));
+            
+            $avgAe = count($ae) > 0 ? array_sum($ae) / count($ae) : 0;
+            $avgMe = count($me) > 0 ? array_sum($me) / count($me) : 0;
+            
+            return [
+                'id' => $i + 1,
+                'start' => $w['start'],
+                'end' => $w['end'],
+                'duration' => $w['duration'],
+                'text' => Str::limit($w['text'], 800, ''),
+                'audio_energy_score' => round($avgAe, 1),
+                'motion_energy_score' => round($avgMe, 1),
+            ];
+        })->all();
 
-        $prompt = 'Rank these transcript windows for TikTok/Reels/YouTube Shorts. Return ONLY a JSON array of 3-5 items with keys: candidate_id, title, hook_text, reason, viral_score, retention_score, recommended_platforms. Pick only windows that can stand alone and have a strong opening. Main topic: '.($analysis->main_topic ?: 'unknown')."\n\nCandidates:\n".json_encode($candidates, JSON_UNESCAPED_UNICODE);
+        $prompt = 'Rank these transcript windows for TikTok/Reels/YouTube Shorts. Return ONLY a JSON array of 3-5 items with keys: candidate_id, title, hook_text, reason, viral_score, retention_score, recommended_platforms. Pick only windows that can stand alone and have a strong opening. Consider the audio_energy_score (shouting/laughing/excitement) and motion_energy_score (action/gestures) when scoring viral_score! Main topic: '.($analysis->main_topic ?: 'unknown')."\n\nCandidates:\n".json_encode($candidates, JSON_UNESCAPED_UNICODE);
 
         $response = $this->ollamaGenerate($prompt);
         if (is_array($response) && count($response) > 0) {

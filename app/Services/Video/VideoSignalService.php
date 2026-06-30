@@ -9,13 +9,12 @@ class VideoSignalService
 {
     public function __construct(private readonly WorkingMediaResolver $resolver) {}
 
-    public function inspectSignals(UploadedVideo $video): array
+    public function inspectSignals(UploadedVideo $video, ?string $audioPath = null): array
     {
         $input = $this->resolver->absolutePath($video);
-
         $hasAudio = (bool) (data_get($video->metadata, '_cliptrend.normalized_metadata.has_audio') ?? data_get($video->metadata, '_cliptrend.has_audio') ?? data_get($video->metadata, '_cliptrend.original_metadata.has_audio') ?? true);
 
-        return [
+        $signals = [
             'speech_segments' => file_exists($input) && $hasAudio ? $this->detectSpeechSegments($input, (float) ($video->duration_seconds ?? 0)) : [],
             'scene_changes' => file_exists($input) ? $this->detectSceneChanges($input) : [],
             'metadata' => [
@@ -25,7 +24,27 @@ class VideoSignalService
                 'frame_rate' => $video->frame_rate,
                 'bitrate' => $video->bitrate,
             ],
+            'multimodal' => [],
         ];
+
+        if ($audioPath && file_exists($audioPath) && file_exists($input)) {
+            $process = new Process([
+                '/usr/bin/python3',
+                base_path('scripts/extract_signals.py'),
+                $input,
+                $audioPath
+            ]);
+            $process->setTimeout(1800);
+            $process->run();
+
+            if ($process->isSuccessful()) {
+                $signals['multimodal'] = json_decode($process->getOutput(), true) ?: [];
+            } else {
+                \Illuminate\Support\Facades\Log::warning('Multi-Modal Extraction Failed: ' . $process->getErrorOutput());
+            }
+        }
+
+        return $signals;
     }
 
     private function detectSpeechSegments(string $absolutePath, float $duration): array

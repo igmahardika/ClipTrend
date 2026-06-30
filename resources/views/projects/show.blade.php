@@ -323,6 +323,10 @@
                                     <option value="center_crop">Static Center Crop</option>
                                 </select>
                             </label>
+                            <label class="mt-4 flex items-center gap-2 text-xs font-bold text-lime-400 cursor-pointer">
+                                <input type="checkbox" name="options[auto_jumpcut]" value="1" checked class="rounded border-white/20 bg-black/40 text-lime-500 focus:ring-lime-500/30">
+                                <span>Auto Jump-Cut (Hapus Jeda Hening)</span>
+                            </label>
                             @if($video && $video->status !== 'pending_ingest')
                                 <button class="ct-button mt-4 w-full">Render Clip</button>
                             @else

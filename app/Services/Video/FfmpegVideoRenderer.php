@@ -45,8 +45,31 @@ class FfmpegVideoRenderer implements VideoRendererInterface
         $preset = $job->preset ?? [];
         $options = $preset['options'] ?? [];
         $hookText = (string) ($preset['hook_text'] ?? $clip->hook_text ?? '');
+        $ffmpeg = config('cliptrend.ffmpeg_path', 'ffmpeg');
+        $mode = $options['crop_mode'] ?? config('cliptrend.default_crop_mode', 'fit_blur');
+        $autoJumpCut = filter_var($options['auto_jumpcut'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
         $subtitleSegments = $preset['subtitle_segments'] ?? ($clip->subtitle?->segments ?? []);
-        $assContent = $this->subtitles->toAss($subtitleSegments, $hookText, (float) $clip->duration_seconds);
+        
+        $durationSeconds = (float) $clip->duration_seconds;
+        $needsCut = true;
+
+        if ($autoJumpCut) {
+            $analysis = \App\Models\VideoAnalysis::where('uploaded_video_id', $video->id)->first();
+            $silences = $analysis?->raw_payload['transcript']['signals']['multimodal']['audio']['silences'] ?? [];
+            if (!empty($silences)) {
+                $jumpcutRes = $this->applyJumpCuts($input, $subtitleSegments, $silences, (float) $clip->start_time, (float) $clip->end_time, $job->id, $ffmpeg);
+                $input = $jumpcutRes['input'];
+                $subtitleSegments = $jumpcutRes['subtitles'];
+                $durationSeconds = $jumpcutRes['duration'];
+                $needsCut = $jumpcutRes['needs_cut'];
+                if (!$needsCut) {
+                    $clip->start_time = 0; // The returned jumpcut input is already starting at 0
+                }
+            }
+        }
+
+        $assContent = $this->subtitles->toAss($subtitleSegments, $hookText, $durationSeconds);
         file_put_contents($subtitleAbs, $assContent);
 
         $renderAssPath = storage_path('app/tmp/render-'.$job->id.'.ass');
@@ -56,23 +79,23 @@ class FfmpegVideoRenderer implements VideoRendererInterface
         $overlayDir = storage_path('app/tmp/render-overlay-'.$job->id);
         @mkdir($overlayDir, 0775, true);
 
-        $ffmpeg = config('cliptrend.ffmpeg_path', 'ffmpeg');
-        
-        $mode = $options['crop_mode'] ?? config('cliptrend.default_crop_mode', 'fit_blur');
-        
         if ($mode === 'smart_crop') {
             $smartCropOutput = storage_path('app/tmp/smartcrop-'.$job->id.'.mp4');
             $segmentInput = storage_path('app/tmp/segment-'.$job->id.'.mp4');
             
-            // 1. Cut the segment first
-            $cutProcess = new Process([
-                $ffmpeg, '-hide_banner', '-y', 
-                '-ss', (string) max(0, (float) $clip->start_time), 
-                '-i', $input, 
-                '-t', (string) max(1, (float) $clip->duration_seconds), 
-                '-c:v', 'copy', '-c:a', 'copy', $segmentInput
-            ]);
-            $cutProcess->run();
+            // 1. Cut the segment first (if not already cut by jumpcut)
+            if ($needsCut) {
+                $cutProcess = new Process([
+                    $ffmpeg, '-hide_banner', '-y', 
+                    '-ss', (string) max(0, (float) $clip->start_time), 
+                    '-i', $input, 
+                    '-t', (string) max(1, $durationSeconds), 
+                    '-c:v', 'copy', '-c:a', 'copy', $segmentInput
+                ]);
+                $cutProcess->run();
+            } else {
+                copy($input, $segmentInput);
+            }
             
             // 2. Run Python Smart Crop
             $pythonProcess = new Process([
@@ -83,25 +106,36 @@ class FfmpegVideoRenderer implements VideoRendererInterface
             
             if ($pythonProcess->isSuccessful() && file_exists($smartCropOutput)) {
                 $input = $smartCropOutput;
-                $clip->start_time = 0; // Segment is already cut
-                $options['crop_mode'] = 'smart_crop_applied'; // Prevent videoFilter from doing static crop again
+                $clip->start_time = 0;
+                $needsCut = false;
+                $options['crop_mode'] = 'smart_crop_applied';
             } else {
                 Log::error('Smart crop failed, falling back', ['error' => $pythonProcess->getErrorOutput()]);
                 $options['crop_mode'] = 'center_crop';
             }
         }
 
-        $vf = $this->videoFilter($options, $renderAssPath, $subtitleSegments, $hookText, (float) $clip->duration_seconds, $overlayDir);
+        $vf = $this->videoFilter($options, $renderAssPath, $subtitleSegments, $hookText, $durationSeconds, $overlayDir);
 
         $cwd = $this->supportsAssFilter() ? dirname($renderAssPath) : null;
-
-        $process = new Process([
+        
+        $ffmpegArgs = [
             $ffmpeg,
             '-hide_banner',
             '-y',
-            '-ss', (string) max(0, (float) $clip->start_time),
-            '-i', $input,
-            '-t', (string) max(1, (float) $clip->duration_seconds),
+        ];
+        
+        if ($needsCut) {
+            array_push($ffmpegArgs, '-ss', (string) max(0, (float) $clip->start_time));
+        }
+        
+        array_push($ffmpegArgs, '-i', $input);
+        
+        if ($needsCut) {
+            array_push($ffmpegArgs, '-t', (string) max(1, $durationSeconds));
+        }
+
+        array_push($ffmpegArgs,
             '-map', '0:v:0',
             '-map', '0:a:0?',
             '-vf', $vf,
@@ -116,8 +150,10 @@ class FfmpegVideoRenderer implements VideoRendererInterface
             '-ac', '2',
             '-movflags', '+faststart',
             '-shortest',
-            $output,
-        ], $cwd);
+            $output
+        );
+
+        $process = new Process($ffmpegArgs, $cwd);
         $process->setTimeout((int) config('cliptrend.render_timeout', 3600));
         $process->run(function ($type, $buffer) use ($job) {
             $this->updateProgressFromBuffer($job, $buffer);
@@ -149,6 +185,88 @@ class FfmpegVideoRenderer implements VideoRendererInterface
             'hashtags' => $preset['hashtags'] ?? [],
             'status' => 'ready',
         ]);
+    }
+
+    private function applyJumpCuts(string $input, array $subtitleSegments, array $silences, float $clipStart, float $clipEnd, string $jobId, string $ffmpeg): array
+    {
+        $clipSilences = [];
+        foreach ($silences as $s) {
+            $sStart = max($clipStart, $s['start']);
+            $sEnd = min($clipEnd, $s['end']);
+            if ($sEnd - $sStart >= 0.35) {
+                $clipSilences[] = ['start' => $sStart, 'end' => $sEnd, 'duration' => $sEnd - $sStart];
+            }
+        }
+
+        if (empty($clipSilences)) {
+            return ['input' => $input, 'subtitles' => $subtitleSegments, 'duration' => $clipEnd - $clipStart, 'needs_cut' => true];
+        }
+
+        $keepChunks = [];
+        $cursor = $clipStart;
+        foreach ($clipSilences as $s) {
+            if ($s['start'] - $cursor > 0.1) {
+                $keepChunks[] = ['start' => $cursor, 'end' => $s['start'], 'duration' => $s['start'] - $cursor];
+            }
+            $cursor = $s['end'];
+        }
+        if ($clipEnd - $cursor > 0.1) {
+            $keepChunks[] = ['start' => $cursor, 'end' => $clipEnd, 'duration' => $clipEnd - $cursor];
+        }
+
+        if (empty($keepChunks)) {
+            return ['input' => $input, 'subtitles' => $subtitleSegments, 'duration' => $clipEnd - $clipStart, 'needs_cut' => true];
+        }
+
+        $newSubtitles = [];
+        foreach ($subtitleSegments as $sub) {
+            $absStart = $sub['start'] + $clipStart;
+            $absEnd = $sub['end'] + $clipStart;
+            
+            $shiftStart = 0;
+            $shiftEnd = 0;
+            $valid = true;
+            foreach ($clipSilences as $s) {
+                if ($s['end'] <= $absStart) $shiftStart += $s['duration'];
+                if ($s['end'] <= $absEnd) $shiftEnd += $s['duration'];
+                if ($absStart >= $s['start'] && $absEnd <= $s['end']) {
+                    $valid = false;
+                }
+            }
+            
+            if ($valid) {
+                $newSubtitles[] = [
+                    'start' => max(0, $sub['start'] - $shiftStart),
+                    'end' => max(0, $sub['end'] - $shiftEnd),
+                    'text' => $sub['text']
+                ];
+            }
+        }
+
+        $concatFile = storage_path('app/tmp/concat-'.$jobId.'.txt');
+        $concatLines = [];
+        $totalDuration = 0;
+        foreach ($keepChunks as $chunk) {
+            $concatLines[] = "file '".$input."'";
+            $concatLines[] = "inpoint ".$chunk['start'];
+            $concatLines[] = "outpoint ".$chunk['end'];
+            $totalDuration += $chunk['duration'];
+        }
+        file_put_contents($concatFile, implode("\n", $concatLines));
+        
+        $jumpCutOutput = storage_path('app/tmp/jumpcut-'.$jobId.'.mp4');
+        
+        $process = new Process([
+            $ffmpeg, '-hide_banner', '-y', '-f', 'concat', '-safe', '0', '-i', $concatFile,
+            '-c', 'copy', $jumpCutOutput
+        ]);
+        $process->run();
+        
+        if ($process->isSuccessful() && file_exists($jumpCutOutput)) {
+            return ['input' => $jumpCutOutput, 'subtitles' => $newSubtitles, 'duration' => $totalDuration, 'needs_cut' => false];
+        }
+
+        return ['input' => $input, 'subtitles' => $subtitleSegments, 'duration' => $clipEnd - $clipStart, 'needs_cut' => true];
     }
 
     private function videoFilter(array $options, string $subtitleAbs, array $subtitleSegments, string $hookText, float $duration, string $overlayDir): string
