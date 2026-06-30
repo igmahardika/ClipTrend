@@ -193,11 +193,13 @@ Ensure every segment has precise start and end times matching the audio. No mark
         $outputDir = dirname($audioAbsolutePath).'/whisper';
         @mkdir($outputDir, 0775, true);
 
+        $language = config('cliptrend.whisper.language');
         $process = new Process(array_filter([
             $bin,
             $audioAbsolutePath,
             '--model', config('cliptrend.whisper.model', 'base'),
-            '--language', config('cliptrend.whisper.language', 'Indonesian'),
+            $language ? '--language' : null,
+            $language ?: null,
             '--output_format', 'json',
             '--output_dir', $outputDir,
             '--fp16', config('cliptrend.whisper.fp16', false) ? 'True' : 'False',

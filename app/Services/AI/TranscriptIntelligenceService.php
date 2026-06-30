@@ -487,15 +487,124 @@ class TranscriptIntelligenceService
 
     private function nicheDictionary(): array
     {
+        $path = storage_path('app/trends.json');
+        if (file_exists($path)) {
+            $content = file_get_contents($path);
+            if ($content) {
+                $json = json_decode($content, true);
+                if (is_array($json) && isset($json['niches'])) {
+                    $niches = [];
+                    foreach ($json['niches'] as $name => $data) {
+                        // Map terms to key => weight (default weight 4 if not specified)
+                        $terms = [];
+                        foreach ($data['terms'] ?? [] as $term) {
+                            $terms[$term] = 4;
+                        }
+                        // Set higher weight for key terms
+                        if ($name === 'Sepak Bola') {
+                            $terms['ronaldo'] = 8;
+                            $terms['cristiano'] = 8;
+                            $terms['football'] = 6;
+                            $terms['bola'] = 6;
+                        }
+                        
+                        $niches[$name] = [
+                            'style' => $data['style'] ?? 'general short-form',
+                            'visual_hint' => $data['visual_hint'] ?? null,
+                            'audience' => $data['audience'] ?? [],
+                            'durations' => $data['durations'] ?? ['shorts' => 45, 'tiktok' => 35, 'reels' => 30],
+                            'platforms' => $data['platforms'] ?? ['tiktok', 'shorts', 'reels'],
+                            'terms' => $terms,
+                        ];
+                    }
+                    return $niches;
+                }
+            }
+        }
+
         return [
-            'Podcast Motivasi' => ['style' => 'motivasi / podcast talking-head', 'visual_hint' => 'talking_head', 'audience' => ['primary' => 'usia 18-35, pekerja muda, mahasiswa, pencari motivasi', 'intent' => 'mencari kalimat relatable dan insight hidup', 'language' => 'Indonesia'], 'durations' => ['shorts' => 45, 'tiktok' => 38, 'reels' => 35], 'platforms' => ['tiktok', 'shorts', 'reels'], 'terms' => ['hidup'=>4,'tanggung jawab'=>5,'dewasa'=>5,'motivasi'=>6,'kuat'=>3,'mental'=>4,'sukses'=>4,'mimpi'=>4,'gagal'=>4,'semangat'=>5,'perjuangan'=>4,'takut'=>3,'berani'=>4]],
-            'Edukasi Bisnis' => ['style' => 'edukasi / business insight', 'audience' => ['primary' => 'founder, sales, marketer, pekerja profesional', 'intent' => 'mencari strategi praktis dan insight bisnis', 'language' => 'Indonesia'], 'durations' => ['shorts' => 50, 'tiktok' => 45, 'reels' => 40], 'platforms' => ['shorts', 'tiktok', 'reels'], 'terms' => ['bisnis'=>6,'jualan'=>5,'marketing'=>6,'customer'=>5,'produk'=>4,'brand'=>4,'omset'=>5,'sales'=>5,'strategi'=>4,'profit'=>4,'market'=>3,'usaha'=>5,'target'=>3,'closing'=>4]],
-            'Tutorial' => ['style' => 'tutorial / step-by-step', 'audience' => ['primary' => 'user yang mencari panduan praktis', 'intent' => 'belajar langkah cepat', 'language' => 'Indonesia'], 'durations' => ['shorts' => 60, 'tiktok' => 55, 'reels' => 50], 'platforms' => ['shorts', 'reels', 'tiktok'], 'terms' => ['cara'=>5,'tutorial'=>6,'langkah'=>5,'setup'=>4,'install'=>4,'gunakan'=>3,'tips'=>4,'trik'=>4,'panduan'=>5,'setting'=>4]],
-            'Event / Konser' => ['style' => 'event hype / entertainment', 'visual_hint' => 'many_scenes', 'audience' => ['primary' => 'penonton musik, event-goers, komunitas lokal', 'intent' => 'mencari info acara dan highlight atmosfer', 'language' => 'Indonesia'], 'durations' => ['shorts' => 30, 'tiktok' => 22, 'reels' => 25], 'platforms' => ['tiktok', 'reels', 'shorts'], 'terms' => ['konser'=>6,'musik'=>4,'panggung'=>5,'semarang'=>3,'tiket'=>5,'lineup'=>5,'artist'=>4,'penonton'=>4,'event'=>6,'festival'=>5,'manggung'=>5,'lagu'=>3]],
-            'Sepak Bola' => ['style' => 'sports editorial / football news', 'audience' => ['primary' => 'fans sepak bola dan Timnas', 'intent' => 'mencari update, analisis, dan emosi pertandingan', 'language' => 'Indonesia'], 'durations' => ['shorts' => 40, 'tiktok' => 35, 'reels' => 30], 'platforms' => ['tiktok', 'shorts', 'reels'], 'terms' => ['bola'=>6,'timnas'=>6,'gol'=>5,'pemain'=>4,'pelatih'=>4,'liga'=>4,'pertandingan'=>5,'menang'=>4,'kalah'=>4,'ranking'=>3,'fifa'=>4,'stadion'=>3,'final'=>4]],
-            'Berita / Commentary' => ['style' => 'news commentary / explain the impact', 'audience' => ['primary' => 'penonton yang mengikuti isu terbaru', 'intent' => 'mencari ringkasan cepat dan konteks', 'language' => 'Indonesia'], 'durations' => ['shorts' => 50, 'tiktok' => 45, 'reels' => 40], 'platforms' => ['shorts', 'tiktok', 'reels'], 'terms' => ['berita'=>6,'update'=>4,'viral'=>4,'pemerintah'=>4,'presiden'=>5,'kasus'=>4,'terbaru'=>4,'isu'=>4,'kabar'=>4,'fakta'=>4,'analisis'=>4]],
-            'Review Produk' => ['style' => 'review / product recommendation', 'audience' => ['primary' => 'calon pembeli dan tech/product enthusiast', 'intent' => 'membandingkan produk sebelum membeli', 'language' => 'Indonesia'], 'durations' => ['shorts' => 45, 'tiktok' => 40, 'reels' => 35], 'platforms' => ['tiktok', 'reels', 'shorts'], 'terms' => ['review'=>6,'produk'=>5,'harga'=>4,'beli'=>4,'kamera'=>4,'fitur'=>5,'kualitas'=>4,'bagus'=>3,'worth'=>5,'rekomendasi'=>5,'unboxing'=>5]],
-            'Customer Service Brand' => ['style' => 'brand support / service communication', 'audience' => ['primary' => 'pelanggan brand dan calon pelanggan', 'intent' => 'mencari solusi cepat atau trust signal', 'language' => 'Indonesia'], 'durations' => ['shorts' => 35, 'tiktok' => 30, 'reels' => 30], 'platforms' => ['reels', 'shorts', 'tiktok'], 'terms' => ['pelanggan'=>6,'layanan'=>5,'komplain'=>5,'internet'=>5,'gangguan'=>5,'helpdesk'=>5,'modem'=>4,'koneksi'=>5,'ticket'=>4,'normal'=>3,'customer'=>4]],
+            'Podcast Motivasi' => [
+                'style' => 'motivasi / podcast talking-head',
+                'visual_hint' => 'talking_head',
+                'audience' => ['primary' => 'usia 18-35, pekerja muda, mahasiswa, pencari motivasi', 'intent' => 'mencari kalimat relatable dan insight hidup', 'language' => 'Indonesia'],
+                'durations' => ['shorts' => 45, 'tiktok' => 38, 'reels' => 35],
+                'platforms' => ['tiktok', 'shorts', 'reels'],
+                'terms' => [
+                    'hidup' => 4, 'tanggung jawab' => 5, 'dewasa' => 5, 'motivasi' => 6, 'kuat' => 3, 'mental' => 4, 'sukses' => 4, 'mimpi' => 4, 'gagal' => 4, 'semangat' => 5, 'perjuangan' => 4, 'takut' => 3, 'berani' => 4,
+                    'life' => 4, 'responsibility' => 5, 'motivation' => 6, 'strong' => 3, 'success' => 4, 'dream' => 4, 'fail' => 4, 'fear' => 3, 'brave' => 4, 'mindset' => 5
+                ]
+            ],
+            'Edukasi Bisnis' => [
+                'style' => 'edukasi / business insight',
+                'audience' => ['primary' => 'founder, sales, marketer, pekerja profesional', 'intent' => 'mencari strategi praktis dan insight bisnis', 'language' => 'Indonesia'],
+                'durations' => ['shorts' => 50, 'tiktok' => 45, 'reels' => 40],
+                'platforms' => ['shorts', 'tiktok', 'reels'],
+                'terms' => [
+                    'bisnis' => 6, 'jualan' => 5, 'marketing' => 6, 'customer' => 5, 'produk' => 4, 'brand' => 4, 'omset' => 5, 'sales' => 5, 'strategi' => 4, 'profit' => 4, 'market' => 3, 'usaha' => 5, 'target' => 3, 'closing' => 4,
+                    'business' => 6, 'revenue' => 5, 'company' => 4, 'founder' => 5, 'invest' => 4, 'money' => 5, 'growth' => 4
+                ]
+            ],
+            'Tutorial' => [
+                'style' => 'tutorial / step-by-step',
+                'audience' => ['primary' => 'user yang mencari panduan praktis', 'intent' => 'belajar langkah cepat', 'language' => 'Indonesia'],
+                'durations' => ['shorts' => 60, 'tiktok' => 55, 'reels' => 50],
+                'platforms' => ['shorts', 'reels', 'tiktok'],
+                'terms' => [
+                    'cara' => 5, 'tutorial' => 6, 'langkah' => 5, 'setup' => 4, 'install' => 4, 'gunakan' => 3, 'tips' => 4, 'trik' => 4, 'panduan' => 5, 'setting' => 4,
+                    'how to' => 5, 'step' => 5, 'guide' => 5, 'learn' => 3
+                ]
+            ],
+            'Event / Konser' => [
+                'style' => 'event hype / entertainment',
+                'visual_hint' => 'many_scenes',
+                'audience' => ['primary' => 'penonton musik, event-goers, komunitas lokal', 'intent' => 'mencari info acara dan highlight atmosfer', 'language' => 'Indonesia'],
+                'durations' => ['shorts' => 30, 'tiktok' => 22, 'reels' => 25],
+                'platforms' => ['tiktok', 'reels', 'shorts'],
+                'terms' => [
+                    'konser' => 6, 'musik' => 4, 'panggung' => 5, 'semarang' => 3, 'tiket' => 5, 'lineup' => 5, 'artist' => 4, 'penonton' => 4, 'event' => 6, 'festival' => 5, 'manggung' => 5, 'lagu' => 3,
+                    'concert' => 6, 'music' => 4, 'stage' => 5, 'ticket' => 5, 'show' => 4, 'singer' => 4
+                ]
+            ],
+            'Sepak Bola' => [
+                'style' => 'sports editorial / football news',
+                'audience' => ['primary' => 'fans sepak bola dan Timnas', 'intent' => 'mencari update, analisis, dan emosi pertandingan', 'language' => 'Indonesia'],
+                'durations' => ['shorts' => 40, 'tiktok' => 35, 'reels' => 30],
+                'platforms' => ['tiktok', 'shorts', 'reels'],
+                'terms' => [
+                    'bola' => 6, 'timnas' => 6, 'gol' => 5, 'pemain' => 4, 'pelatih' => 4, 'liga' => 4, 'pertandingan' => 5, 'menang' => 4, 'kalah' => 4, 'ranking' => 3, 'fifa' => 4, 'stadion' => 3, 'final' => 4,
+                    'football' => 6, 'soccer' => 6, 'ronaldo' => 8, 'messi' => 6, 'cristiano' => 8, 'goal' => 6, 'match' => 5, 'game' => 4, 'player' => 4, 'coach' => 4, 'stadium' => 3, 'club' => 4
+                ]
+            ],
+            'Berita / Commentary' => [
+                'style' => 'news commentary / explain the impact',
+                'audience' => ['primary' => 'penonton yang mengikuti isu terbaru', 'intent' => 'mencari ringkasan cepat dan konteks', 'language' => 'Indonesia'],
+                'durations' => ['shorts' => 50, 'tiktok' => 45, 'reels' => 40],
+                'platforms' => ['shorts', 'tiktok', 'reels'],
+                'terms' => [
+                    'berita' => 6, 'update' => 4, 'viral' => 4, 'pemerintah' => 4, 'presiden' => 5, 'kasus' => 4, 'terbaru' => 4, 'isu' => 4, 'kabar' => 4, 'fakta' => 4, 'analisis' => 4,
+                    'news' => 6, 'latest' => 4, 'report' => 4, 'president' => 5, 'issue' => 4
+                ]
+            ],
+            'Review Produk' => [
+                'style' => 'review / product recommendation',
+                'audience' => ['primary' => 'calon pembeli dan tech/product enthusiast', 'intent' => 'membandingkan produk sebelum membeli', 'language' => 'Indonesia'],
+                'durations' => ['shorts' => 45, 'tiktok' => 40, 'reels' => 35],
+                'platforms' => ['tiktok', 'reels', 'shorts'],
+                'terms' => [
+                    'review' => 6, 'produk' => 5, 'harga' => 4, 'beli' => 4, 'kamera' => 4, 'fitur' => 5, 'kualitas' => 4, 'bagus' => 3, 'worth' => 5, 'rekomendasi' => 5, 'unboxing' => 5,
+                    'camera' => 4, 'features' => 5, 'quality' => 4, 'buy' => 4, 'unboxing' => 5, 'price' => 4
+                ]
+            ],
+            'Customer Service Brand' => [
+                'style' => 'brand support / service communication',
+                'audience' => ['primary' => 'pelanggan brand dan calon pelanggan', 'intent' => 'mencari solusi cepat atau trust signal', 'language' => 'Indonesia'],
+                'durations' => ['shorts' => 35, 'tiktok' => 30, 'reels' => 30],
+                'platforms' => ['reels', 'shorts', 'tiktok'],
+                'terms' => [
+                    'pelanggan' => 6, 'layanan' => 5, 'komplain' => 5, 'internet' => 5, 'gangguan' => 5, 'helpdesk' => 5, 'modem' => 4, 'koneksi' => 5, 'ticket' => 4, 'normal' => 3, 'customer' => 4,
+                    'support' => 5, 'service' => 5, 'modem' => 4, 'connection' => 5
+                ]
+            ],
         ];
     }
 

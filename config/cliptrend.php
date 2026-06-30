@@ -36,7 +36,7 @@ return [
     'whisper' => [
         'bin' => env('WHISPER_BIN'),
         'model' => env('WHISPER_MODEL', 'base'),
-        'language' => env('WHISPER_LANGUAGE', 'Indonesian'),
+        'language' => env('WHISPER_LANGUAGE', null),
         'fp16' => (bool) env('WHISPER_FP16', false),
     ],
     'trends' => ['provider' => env('TREND_PROVIDER', 'youtube')],
