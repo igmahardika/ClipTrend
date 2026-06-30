@@ -9,6 +9,21 @@
     $renderingJobs = $project->renderJobs->whereIn('status', ['pending','processing']);
 @endphp
 
+<div class="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <a href="{{ route('projects.index') }}" class="ct-button-ghost">← Kembali ke Projects</a>
+    <div class="flex flex-wrap items-center gap-3">
+        <a href="{{ route('projects.edit', $project) }}" class="ct-button-secondary">Edit Project</a>
+        <form action="{{ route('projects.destroy', $project) }}" method="POST"
+              onsubmit="return confirm('Apakah Anda yakin ingin menghapus project ini? Semua file render dan data analisis terkait akan ikut terhapus.')">
+            @csrf
+            @method('DELETE')
+            <button class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-400 hover:bg-red-500 hover:text-white transition">
+                Hapus Project
+            </button>
+        </form>
+    </div>
+</div>
+
 <section class="ct-grid-hero" id="workspace">
     <div class="ct-panel">
         <div class="ct-panel-header">
