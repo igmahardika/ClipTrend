@@ -25,6 +25,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/projects/{project}/clips/{clip}/subtitles', [SubtitleController::class, 'update'])->name('clips.subtitles.update');
     Route::post('/projects/{project}/clips/{clip}/render', [RenderController::class, 'store'])->name('clips.render');
     Route::get('/render-jobs/{renderJob}', [RenderController::class, 'show'])->name('render-jobs.show');
+    Route::get('/render-jobs/{renderJob}/status', [App\Http\Controllers\Api\ProjectStatusController::class, 'renderJob'])->name('render-jobs.status');
     Route::post('/render-jobs/{renderJob}/retry', [RenderController::class, 'retry'])->name('render-jobs.retry');
     Route::get('/outputs', [OutputLibraryController::class, 'index'])->name('outputs.index');
     Route::get('/outputs/{renderedVideo}/download', [OutputLibraryController::class, 'download'])->name('outputs.download');

@@ -93,7 +93,7 @@ window.renderJobPoller = function (jobId, initialStatus) {
 
         async poll() {
             try {
-                const response = await fetch('/api/render-jobs/' + jobId + '/status');
+                const response = await fetch('/render-jobs/' + jobId + '/status');
                 if (!response.ok) return;
                 const data = await response.json();
                 this.status = data.status;
