@@ -42,7 +42,8 @@ class OllamaProvider implements AiProviderInterface
             return $this->normalizeClassification($response);
         }
 
-        return $this->fallbackClassification();
+        Log::warning('Ollama classification failed or returned empty. Falling back to RealAiProvider.');
+        return $this->realAi->classifyVideo($video, $transcript);
     }
 
     public function detectClipCandidates(VideoAnalysis $analysis): array
@@ -112,7 +113,8 @@ class OllamaProvider implements AiProviderInterface
             return $clips;
         }
 
-        return [];
+        Log::warning('Ollama clip candidates generation failed or returned empty. Falling back to RealAiProvider.');
+        return $this->realAi->detectClipCandidates($analysis);
     }
 
     public function generateCopyPack(array $classification, array $transcript): array
@@ -131,14 +133,8 @@ class OllamaProvider implements AiProviderInterface
             ];
         }
 
-        return [
-            'title' => 'Video Keren',
-            'caption' => 'Cek video ini! #viral',
-            'hashtags' => ['#fyp', '#viral'],
-            'keywords' => [],
-            'platform' => 'tiktok',
-            'source' => 'fallback',
-        ];
+        Log::warning('Ollama copy pack generation failed. Falling back to RealAiProvider.');
+        return $this->realAi->generateCopyPack($classification, $transcript);
     }
 
     public function generateSubtitleSegments(Clip $clip, array $transcriptSegments = []): array
